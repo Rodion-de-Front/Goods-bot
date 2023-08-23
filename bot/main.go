@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -97,13 +98,35 @@ type MessageInlineT struct {
 
 // структура пользователя
 type UserT struct {
-	ID          int    `json:"id"`
-	FirstName   string `json:"first_name"`
-	LastName    string `json:"last_name"`
-	Username    string `json:"tg_username"`
-	Step        int    `json:"step"`
-	Tg_id       int    `json:"tg_id"`
-	PhoneNumber string `json:"phone"`
+	ID        int    `json:"id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Step      int    `json:"step"`
+	Tg_id     int    `json:"tg_id"`
+	Order     Order  `json:"order"`
+}
+
+type Order struct {
+	FirstName        string    `json:"first_name"`
+	LastName         string    `json:"last_name"`
+	RegDate          string    `json:"reg_date"`
+	OrganizationName string    `json:"organization_name"`
+	Products         []Product `json:"product"`
+	Shipment         string    `json:"shipment"`
+	Supply           string    `json:"supply"`
+	Comment          string    `json:"comment"`
+}
+
+type Product struct {
+	Marketplace       string   `json:"marketplace"`
+	Type              string   `json:"type"`
+	Undertype         string   `json:"undertype"`
+	Size              string   `json:"size"`
+	Weight            string   `json:"weight"`
+	Color             string   `json:"color"`
+	Count             string   `json:"count"`
+	SelectedPackaging []string `json:"selected_packaging"`
+	Marking           string   `json:"marking"`
 }
 
 // переменные для подключения к боту
@@ -112,6 +135,7 @@ var token string = os.Getenv("BOT_TOKEN")
 
 // данные всеx пользователей
 var usersDB map[int]UserT
+var newProduct = Product{}
 
 // главная функция работы бота
 func main() {
@@ -227,9 +251,7 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 
 	firstName := message.Message.From.FirstName
 	lastName := message.Message.From.LastName
-	phone := message.Message.Contact.PhoneNumber
-	username := message.Message.From.Username
-	//button := messageInline.CallbackQuery.Data
+	button := messageInline.CallbackQuery.Data
 
 	//есть ли юзер
 	_, exist := usersDB[chatId]
@@ -238,9 +260,7 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 		user.ID = chatId
 		user.FirstName = firstName
 		user.LastName = lastName
-		user.Username = username
 		user.Tg_id = chatId
-		user.PhoneNumber = phone
 		user.Step = 1
 
 		usersDB[chatId] = user
@@ -253,16 +273,403 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 
 	switch {
 	// кейс для начального сообщения для пользователя
-	case text == "/start" || usersDB[chatId].Step == 1:
+	case text == "/start" || usersDB[chatId].Step == 1 || text == "Заказать ещё":
 
 		user := usersDB[chatId]
+		user.Step = 1
+		usersDB[chatId] = user
 
 		// Отправляем сообщение с клавиатурой и перезаписываем шаг
-		sendMessage(chatId, text, nil)
+		sendMessage(chatId, "Здраствуйте! Добро пожаловать в <Название бота>. Введите название организации (ИП или ООО)", nil)
+
+		user.Order.FirstName = firstName
+		user.Order.LastName = lastName
+		user.Step += 1
+		usersDB[chatId] = user
+		break
+
+	//кейс для выбора маркетплейса
+	case usersDB[chatId].Step == 2:
+
+		newProduct = Product{}
+
+		if strings.Contains(text, "ИП") || strings.Contains(text, "ООО") {
+
+			user := usersDB[chatId]
+
+			user.Order.OrganizationName = text
+
+			//собираем объект клавиатуры для выбора языка
+			buttons := [][]map[string]interface{}{
+				{{"text": "Ozon", "callback_data": "ozon"}},
+				{{"text": "Wildberris", "callback_data": "wildberris"}},
+				{{"text": "Yandex", "callback_data": "yandex"}},
+			}
+
+			inlineKeyboard := map[string]interface{}{
+				"inline_keyboard": buttons,
+			}
+
+			sendMessage(chatId, "Выберите маркетплейс", inlineKeyboard)
+
+			user.Step += 1
+			usersDB[chatId] = user
+
+		} else {
+			sendMessage(chatId, "Имя организации должно начинаться с ИП или ООО", nil)
+		}
+
+		break
+
+	case usersDB[chatId].Step == 3:
+
+		user := usersDB[chatId]
+		// Создаем новый экземпляр Product
+		newProduct = Product{
+			Marketplace: button,
+		}
+		user.Order.Products = append(user.Order.Products, newProduct)
+
+		//собираем объект клавиатуры для выбора языка
+		buttons := [][]map[string]interface{}{
+			{{"text": "Одежда", "callback_data": "Одежда"}},
+			{{"text": "Бытовая техника", "callback_data": "Бытовая техника"}},
+			{{"text": "Автомобили", "callback_data": "Автомобили"}},
+			{{"text": "Другое", "callback_data": "another"}},
+		}
+
+		inlineKeyboard := map[string]interface{}{
+			"inline_keyboard": buttons,
+		}
+
+		sendMessage(chatId, "Выберите вид товара", inlineKeyboard)
 
 		user.Step += 1
 		usersDB[chatId] = user
 		break
+
+	case button == "another":
+		sendMessage(chatId, "Введите нужную информацию", nil)
+
+	case usersDB[chatId].Step == 4:
+
+		fmt.Println(usersDB[chatId].Step)
+
+		user := usersDB[chatId]
+		productIndex := len(user.Order.Products) - 1
+		if text != "" {
+			user.Order.Products[productIndex].Type = text
+		} else {
+			user.Order.Products[productIndex].Type = button
+		}
+
+		if button == "Одежда" {
+			//собираем объект клавиатуры для выбора языка
+			buttons := [][]map[string]interface{}{
+				{{"text": "Куртка", "callback_data": "Куртка"}},
+				{{"text": "Майка", "callback_data": "Майка"}},
+				{{"text": "Футболка", "callback_data": "Футболка"}},
+				{{"text": "Другое", "callback_data": "another"}},
+			}
+
+			inlineKeyboard := map[string]interface{}{
+				"inline_keyboard": buttons,
+			}
+
+			sendMessage(chatId, "Выберите вид товара", inlineKeyboard)
+		} else {
+			sendMessage(chatId, "Введите нужный подвив вашего товара информацию", nil)
+		}
+
+		user.Step += 1
+		usersDB[chatId] = user
+		break
+
+	case usersDB[chatId].Step == 5:
+
+		user := usersDB[chatId]
+		productIndex := len(user.Order.Products) - 1
+		if text != "" {
+			user.Order.Products[productIndex].Undertype = text
+		} else {
+			user.Order.Products[productIndex].Undertype = button
+		}
+
+		sendMessage(chatId, "Отправьте размеры товара в см (120Х48)", nil)
+
+		user.Step += 1
+		usersDB[chatId] = user
+		break
+
+	case usersDB[chatId].Step == 6:
+
+		user := usersDB[chatId]
+		productIndex := len(user.Order.Products) - 1
+		user.Order.Products[productIndex].Size = text
+
+		sendMessage(chatId, "Отправьте вес товара в кг (3кг)", nil)
+
+		user.Step += 1
+		usersDB[chatId] = user
+		break
+
+	case usersDB[chatId].Step == 7:
+
+		user := usersDB[chatId]
+		productIndex := len(user.Order.Products) - 1
+		user.Order.Products[productIndex].Weight = text
+
+		//собираем объект клавиатуры для выбора языка
+		buttons := [][]map[string]interface{}{
+			{{"text": "Белый", "callback_data": "Белый"}},
+			{{"text": "Чёрный", "callback_data": "Чёрный"}},
+			{{"text": "Красный", "callback_data": "Красный"}},
+			{{"text": "Зелёный", "callback_data": "Зелёный"}},
+			{{"text": "Жёлтый", "callback_data": "Жёлтый"}},
+			{{"text": "Коричневый", "callback_data": "Коричневый"}},
+			{{"text": "Розовый", "callback_data": "Розовый"}},
+			{{"text": "Другое", "callback_data": "another"}},
+		}
+
+		inlineKeyboard := map[string]interface{}{
+			"inline_keyboard": buttons,
+		}
+
+		sendMessage(chatId, "Выберите цвет товара", inlineKeyboard)
+
+		user.Step += 1
+		usersDB[chatId] = user
+		break
+
+	case usersDB[chatId].Step == 8:
+
+		user := usersDB[chatId]
+		productIndex := len(user.Order.Products) - 1
+		if text != "" {
+			user.Order.Products[productIndex].Color = text
+		} else {
+			user.Order.Products[productIndex].Color = button
+		}
+
+		sendMessage(chatId, "Отправьте количество товара", nil)
+
+		user.Step += 1
+		usersDB[chatId] = user
+		break
+
+	case usersDB[chatId].Step == 9 || button == "yes":
+		user := usersDB[chatId]
+
+		if button == "" {
+			productIndex := len(user.Order.Products) - 1
+			user.Order.Products[productIndex].Count = text
+		}
+		user.Step = 9
+		usersDB[chatId] = user
+
+		// Собираем объект клавиатуры для выбора упаковки
+		buttons := [][]map[string]interface{}{
+			{{"text": "Пупырчатая пленка", "callback_data": "Пупырчатая пленка"}},
+			{{"text": "Стрейч пленка", "callback_data": "Стрейч пленка"}},
+			{{"text": "Коробка", "callback_data": "Коробка"}},
+			{{"text": "ПВД рукав", "callback_data": "ПВД рукав"}},
+			{{"text": "БОПП пакет", "callback_data": "БОПП пакет"}},
+			{{"text": "Почтовый пакет", "callback_data": "Почтовый пакет"}},
+			{{"text": "ЗИП-лок пакет", "callback_data": "ЗИП-лок пакет"}},
+		}
+
+		inlineKeyboard := map[string]interface{}{
+			"inline_keyboard": buttons,
+		}
+
+		sendMessage(chatId, "Выберите упаковку", inlineKeyboard)
+
+		user.Step += 1
+		usersDB[chatId] = user
+		break
+
+	case button == "no":
+		user := usersDB[chatId]
+
+		buttons := [][]map[string]interface{}{
+			{{"text": "Маркировка на упаковку", "callback_data": "на упаковку"}},
+			{{"text": "Маркировка на товар и упаковку", "callback_data": "на товар и упаковку"}},
+			{{"text": "Маркировка честный знак на упаковку", "callback_data": "честный знак на упаковку"}},
+			{{"text": "Маркировка честный знак на бирку", "callback_data": "честный знак на бирку"}},
+			{{"text": "Маркировка честный знак на бирку и упаковку", "callback_data": "честный знак на бирку и упаковку"}},
+		}
+
+		inlineKeyboard := map[string]interface{}{
+			"inline_keyboard": buttons,
+		}
+
+		sendMessage(chatId, "Выберите подходящую маркировку", inlineKeyboard)
+		fmt.Println(usersDB[chatId].Step)
+		user.Step += 1
+		usersDB[chatId] = user
+		fmt.Println(usersDB[chatId].Step)
+		break
+
+	case usersDB[chatId].Step == 10:
+
+		user := usersDB[chatId]
+
+		productIndex := len(user.Order.Products) - 1
+		user.Order.Products[productIndex].SelectedPackaging = append(user.Order.Products[productIndex].SelectedPackaging, button)
+
+		usersDB[chatId] = user
+
+		// Создайте объект клавиатуры для выбора между "Да" и "Нет"
+		buttons := [][]map[string]interface{}{
+			{{"text": "Да", "callback_data": "yes"}},
+			{{"text": "Нет", "callback_data": "no"}},
+		}
+
+		inlineKeyboard := map[string]interface{}{
+			"inline_keyboard": buttons,
+		}
+
+		sendMessage(chatId, "Нужна ещё одна упаковка?", inlineKeyboard)
+		break
+
+	case usersDB[chatId].Step == 11:
+
+		user := usersDB[chatId]
+
+		productIndex := len(user.Order.Products) - 1
+		user.Order.Products[productIndex].Marking = button
+
+		// Собираем объект клавиатуры для выбора упаковки
+		buttons := [][]map[string]interface{}{
+			{{"text": "Добавить", "callback_data": "add_good"}},
+			{{"text": "Дальше", "callback_data": "continue"}},
+		}
+
+		inlineKeyboard := map[string]interface{}{
+			"inline_keyboard": buttons,
+		}
+
+		sendMessage(chatId, "Добавить ещё товар?", inlineKeyboard)
+
+		user.Step += 1
+		usersDB[chatId] = user
+		break
+
+	case usersDB[chatId].Step == 12 && button == "add_good":
+		user := usersDB[chatId]
+		user.Step = 2
+		usersDB[chatId] = user
+
+		//собираем объект клавиатуры для выбора языка
+		buttons := [][]map[string]interface{}{
+			{{"text": "Ozon", "callback_data": "ozon"}},
+			{{"text": "Wildberris", "callback_data": "wildberris"}},
+			{{"text": "Yandex", "callback_data": "yandex"}},
+		}
+
+		inlineKeyboard := map[string]interface{}{
+			"inline_keyboard": buttons,
+		}
+
+		sendMessage(chatId, "Выберите маркетплейс", inlineKeyboard)
+
+		user.Step += 1
+		usersDB[chatId] = user
+
+	case usersDB[chatId].Step == 12 && button == "continue":
+
+		user := usersDB[chatId]
+
+		sendMessage(chatId, "Когда планиурется отгрузка", nil)
+
+		user.Step += 1
+		usersDB[chatId] = user
+
+	case usersDB[chatId].Step == 13:
+		user := usersDB[chatId]
+		user.Order.Shipment = text
+
+		//собираем объект клавиатуры для выбора языка
+		buttons := [][]map[string]interface{}{
+			{{"text": "Клиент формирует поставку сам", "callback_data": "формирует сам"}},
+			{{"text": "Формирование поставки нашими силами", "callback_data": "нашими силами"}},
+		}
+
+		inlineKeyboard := map[string]interface{}{
+			"inline_keyboard": buttons,
+		}
+
+		sendMessage(chatId, "Дата поставки на маркетплейс", inlineKeyboard)
+
+		user.Step += 1
+		usersDB[chatId] = user
+		break
+
+	case usersDB[chatId].Step == 14:
+		user := usersDB[chatId]
+		user.Order.Supply = button
+
+		//собираем объект клавиатуры для выбора языка
+		buttons := [][]map[string]interface{}{
+			{{"text": "Нет", "callback_data": "finish"}},
+		}
+
+		inlineKeyboard := map[string]interface{}{
+			"inline_keyboard": buttons,
+		}
+
+		sendMessage(chatId, "Особые коментарии к заказу", inlineKeyboard)
+		user.Step += 1
+		usersDB[chatId] = user
+		break
+
+	case usersDB[chatId].Step == 15:
+
+		user := usersDB[chatId]
+		user.Order.Comment = text
+		// Получите текущее время
+		currentTime := time.Now()
+
+		// Определите, сколько часов вы хотите прибавить
+		hoursToAdd := 3
+
+		// Прибавьте указанное количество часов
+		newTime := currentTime.Add(time.Duration(hoursToAdd) * time.Hour)
+
+		// Определите желаемый формат времени
+		format := "2006-01-02 15:04" // Например, "год-месяц-день час:минута"
+
+		// Преобразуйте новое время в строку с помощью метода Format
+		formattedTime := newTime.Format(format)
+
+		user.Order.RegDate = formattedTime
+		// Создаем объект клавиатуры
+		keyboard := map[string]interface{}{
+			"keyboard": [][]map[string]interface{}{
+				{
+					{
+						"text": "Заказать ещё",
+					},
+				},
+			},
+			"resize_keyboard":   true,
+			"one_time_keyboard": true,
+		}
+		sendMessage(chatId, "Спасибо за Ваш заказ. Для ещё одного заказа нажмите на кнопку ниже", keyboard)
+		user.Step = 1
+		usersDB[chatId] = user
+
+		file, _ := os.Create("db.json")
+		jsonString, _ := json.Marshal(usersDB)
+		file.Write(jsonString)
+
+		break
+
 	}
 
 }
+
+// // //сохраняем в файл для отдачи данных
+// // fileU, _ := os.Create("orders.json")
+// // data, _ := json.Marshal(user)
+// // fileU.Write(data)
