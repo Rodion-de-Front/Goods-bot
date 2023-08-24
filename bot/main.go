@@ -120,13 +120,13 @@ type Order struct {
 type Product struct {
 	Marketplace       string   `json:"marketplace"`
 	Type              string   `json:"type"`
-	Undertype         string   `json:"undertype"`
 	Size              string   `json:"size"`
 	Weight            string   `json:"weight"`
-	Color             string   `json:"color"`
+	Description       string   `json:"color"`
 	Count             string   `json:"count"`
 	SelectedPackaging []string `json:"selected_packaging"`
 	Marking           string   `json:"marking"`
+	Barcode           string   `json:"barcode"`
 }
 
 // переменные для подключения к боту
@@ -330,19 +330,7 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 		}
 		user.Order.Products = append(user.Order.Products, newProduct)
 
-		//собираем объект клавиатуры для выбора языка
-		buttons := [][]map[string]interface{}{
-			{{"text": "Одежда", "callback_data": "Одежда"}},
-			{{"text": "Бытовая техника", "callback_data": "Бытовая техника"}},
-			{{"text": "Автомобили", "callback_data": "Автомобили"}},
-			{{"text": "Другое", "callback_data": "another"}},
-		}
-
-		inlineKeyboard := map[string]interface{}{
-			"inline_keyboard": buttons,
-		}
-
-		sendMessage(chatId, "Выберите вид товара", inlineKeyboard)
+		sendMessage(chatId, "Введите вид товара. Например: Худи Найк, MacBook, Телевизор Sumsung и др", nil)
 
 		user.Step += 1
 		usersDB[chatId] = user
@@ -353,8 +341,6 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 
 	case usersDB[chatId].Step == 4:
 
-		fmt.Println(usersDB[chatId].Step)
-
 		user := usersDB[chatId]
 		productIndex := len(user.Order.Products) - 1
 		if text != "" {
@@ -363,45 +349,13 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 			user.Order.Products[productIndex].Type = button
 		}
 
-		if button == "Одежда" {
-			//собираем объект клавиатуры для выбора языка
-			buttons := [][]map[string]interface{}{
-				{{"text": "Куртка", "callback_data": "Куртка"}},
-				{{"text": "Майка", "callback_data": "Майка"}},
-				{{"text": "Футболка", "callback_data": "Футболка"}},
-				{{"text": "Другое", "callback_data": "another"}},
-			}
-
-			inlineKeyboard := map[string]interface{}{
-				"inline_keyboard": buttons,
-			}
-
-			sendMessage(chatId, "Выберите вид товара", inlineKeyboard)
-		} else {
-			sendMessage(chatId, "Введите нужный подвив вашего товара информацию", nil)
-		}
-
-		user.Step += 1
-		usersDB[chatId] = user
-		break
-
-	case usersDB[chatId].Step == 5:
-
-		user := usersDB[chatId]
-		productIndex := len(user.Order.Products) - 1
-		if text != "" {
-			user.Order.Products[productIndex].Undertype = text
-		} else {
-			user.Order.Products[productIndex].Undertype = button
-		}
-
 		sendMessage(chatId, "Отправьте размеры товара в см (120Х48)", nil)
 
 		user.Step += 1
 		usersDB[chatId] = user
 		break
 
-	case usersDB[chatId].Step == 6:
+	case usersDB[chatId].Step == 5:
 
 		user := usersDB[chatId]
 		productIndex := len(user.Order.Products) - 1
@@ -413,42 +367,26 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 		usersDB[chatId] = user
 		break
 
-	case usersDB[chatId].Step == 7:
+	case usersDB[chatId].Step == 6:
 
 		user := usersDB[chatId]
 		productIndex := len(user.Order.Products) - 1
 		user.Order.Products[productIndex].Weight = text
 
-		//собираем объект клавиатуры для выбора языка
-		buttons := [][]map[string]interface{}{
-			{{"text": "Белый", "callback_data": "Белый"}},
-			{{"text": "Чёрный", "callback_data": "Чёрный"}},
-			{{"text": "Красный", "callback_data": "Красный"}},
-			{{"text": "Зелёный", "callback_data": "Зелёный"}},
-			{{"text": "Жёлтый", "callback_data": "Жёлтый"}},
-			{{"text": "Коричневый", "callback_data": "Коричневый"}},
-			{{"text": "Розовый", "callback_data": "Розовый"}},
-			{{"text": "Другое", "callback_data": "another"}},
-		}
-
-		inlineKeyboard := map[string]interface{}{
-			"inline_keyboard": buttons,
-		}
-
-		sendMessage(chatId, "Выберите цвет товара", inlineKeyboard)
+		sendMessage(chatId, "Введите характеристики товара. Например: белый цвет, Оперативная память 16Гб и тд", nil)
 
 		user.Step += 1
 		usersDB[chatId] = user
 		break
 
-	case usersDB[chatId].Step == 8:
+	case usersDB[chatId].Step == 7:
 
 		user := usersDB[chatId]
 		productIndex := len(user.Order.Products) - 1
 		if text != "" {
-			user.Order.Products[productIndex].Color = text
+			user.Order.Products[productIndex].Description = text
 		} else {
-			user.Order.Products[productIndex].Color = button
+			user.Order.Products[productIndex].Description = button
 		}
 
 		sendMessage(chatId, "Отправьте количество товара", nil)
@@ -457,14 +395,14 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 		usersDB[chatId] = user
 		break
 
-	case usersDB[chatId].Step == 9 || button == "yes":
+	case usersDB[chatId].Step == 8 || button == "yes":
 		user := usersDB[chatId]
 
 		if button == "" {
 			productIndex := len(user.Order.Products) - 1
 			user.Order.Products[productIndex].Count = text
 		}
-		user.Step = 9
+		user.Step = 8
 		usersDB[chatId] = user
 
 		// Собираем объект клавиатуры для выбора упаковки
@@ -472,6 +410,7 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 			{{"text": "Пупырчатая пленка", "callback_data": "Пупырчатая пленка"}},
 			{{"text": "Стрейч пленка", "callback_data": "Стрейч пленка"}},
 			{{"text": "Коробка", "callback_data": "Коробка"}},
+			{{"text": "Термоусадочный пакет", "callback_data": "Термоусадочный пакет"}},
 			{{"text": "ПВД рукав", "callback_data": "ПВД рукав"}},
 			{{"text": "БОПП пакет", "callback_data": "БОПП пакет"}},
 			{{"text": "Почтовый пакет", "callback_data": "Почтовый пакет"}},
@@ -488,15 +427,28 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 		usersDB[chatId] = user
 		break
 
+	case button == "Коробка" || button == "БОПП пакет" || button == "Почтовый пакет" || button == "ЗИП-лок пакет":
+
+		sendMessage(chatId, "Введите требуемые размеры выбранной упаковки в см", nil)
+
+		user := usersDB[chatId]
+
+		productIndex := len(user.Order.Products) - 1
+		user.Order.Products[productIndex].SelectedPackaging = append(user.Order.Products[productIndex].SelectedPackaging, button)
+
+		user.Step = 9
+		usersDB[chatId] = user
+		break
+
 	case button == "no":
 		user := usersDB[chatId]
 
 		buttons := [][]map[string]interface{}{
-			{{"text": "Маркировка на упаковку", "callback_data": "на упаковку"}},
-			{{"text": "Маркировка на товар и упаковку", "callback_data": "на товар и упаковку"}},
-			{{"text": "Маркировка честный знак на упаковку", "callback_data": "честный знак на упаковку"}},
-			{{"text": "Маркировка честный знак на бирку", "callback_data": "честный знак на бирку"}},
-			{{"text": "Маркировка честный знак на бирку и упаковку", "callback_data": "честный знак на бирку и упаковку"}},
+			{{"text": "Маркировка на упаковку", "callback_data": "Марк на упаковку"}},
+			{{"text": "Маркировка на товар и упаковку", "callback_data": " Марк на товар и упаковку"}},
+			{{"text": "Честный знак на упаковку", "callback_data": "чз на упаковку"}},
+			{{"text": "Честный знак на бирку", "callback_data": "чз на бирку"}},
+			{{"text": "Честный знак на бирку и упаковку", "callback_data": "чз на бирку и упаковку"}},
 		}
 
 		inlineKeyboard := map[string]interface{}{
@@ -510,12 +462,18 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 		fmt.Println(usersDB[chatId].Step)
 		break
 
-	case usersDB[chatId].Step == 10:
+	case usersDB[chatId].Step == 9:
 
 		user := usersDB[chatId]
 
-		productIndex := len(user.Order.Products) - 1
-		user.Order.Products[productIndex].SelectedPackaging = append(user.Order.Products[productIndex].SelectedPackaging, button)
+		if text != "" {
+			productIndex := len(user.Order.Products) - 1
+			packageIndex := len(user.Order.Products[productIndex].SelectedPackaging) - 1
+			user.Order.Products[productIndex].SelectedPackaging[packageIndex] += " " + text
+		} else {
+			productIndex := len(user.Order.Products) - 1
+			user.Order.Products[productIndex].SelectedPackaging = append(user.Order.Products[productIndex].SelectedPackaging, button)
+		}
 
 		usersDB[chatId] = user
 
@@ -532,12 +490,29 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 		sendMessage(chatId, "Нужна ещё одна упаковка?", inlineKeyboard)
 		break
 
-	case usersDB[chatId].Step == 11:
+	case usersDB[chatId].Step == 10:
 
 		user := usersDB[chatId]
 
 		productIndex := len(user.Order.Products) - 1
 		user.Order.Products[productIndex].Marking = button
+
+		if user.Order.Products[productIndex].Marketplace == "yandex" || user.Order.Products[productIndex].Marketplace == "wildberris" {
+			sendMessage(chatId, "Отправьте числовой баркод из маркетплейса", nil)
+		} else {
+			sendMessage(chatId, "Отправьте файл pdf c баркодом из маркетплейса", nil)
+		}
+
+		user.Step += 1
+		usersDB[chatId] = user
+		break
+
+	case usersDB[chatId].Step == 11:
+
+		user := usersDB[chatId]
+
+		productIndex := len(user.Order.Products) - 1
+		user.Order.Products[productIndex].Barcode = text
 
 		// Собираем объект клавиатуры для выбора упаковки
 		buttons := [][]map[string]interface{}{
@@ -585,7 +560,7 @@ func processMessage(message MessageT, messageInline MessageInlineT) {
 		user.Step += 1
 		usersDB[chatId] = user
 
-	case usersDB[chatId].Step == 13:
+	case usersDB[chatId].Step == 14:
 		user := usersDB[chatId]
 		user.Order.Shipment = text
 
